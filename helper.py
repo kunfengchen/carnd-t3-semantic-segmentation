@@ -138,3 +138,9 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
         sess, logits, keep_prob, input_image, os.path.join(data_dir, 'data_road/testing'), image_shape)
     for name, image in image_outputs:
         scipy.misc.imsave(os.path.join(output_dir, name), image)
+
+
+# Source from lecture 9.5 quiz
+# custom init with the seed set to 0 by default
+#def custom_init(shape, dtype=tf.float32, partition_info=None, seed=0):
+#    return tf.random_normal(shape, dtype=dtype, seed=seed)
