@@ -70,11 +70,11 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     print(input.shape)
     input = tf.add(input, vgg_layer4_out)
     input = tf.layers.conv2d_transpose(input, 256, 4, 2)
-    print(input.shape)
+    print(input)
     input = tf.add(input, vgg_layer3_out)
     input = tf.layers.conv2d_transpose(input, num_classes, 16, 8)
 
-    print(input.shape)
+    print(input)
     return input
 tests.test_layers(layers)
 
@@ -89,7 +89,11 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # TODO: Implement function
-    return None, None, None
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    cross_entropy_loss = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels = correct_label))
+    train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+    return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
 
 
@@ -139,8 +143,12 @@ def run():
         # TODO: Build NN using load_vgg, layers, and optimize function
         inupt, keep, layer3, layer4, layer7 = load_vgg(sess, vgg_path)
         layer_out = layers(layer3, layer4, layer7, num_classes)
-        logist = tf.reshape(layer_out, (-1, num_classes))
-        optimize(logist, )
+        last_layer = tf.reshape(layer_out, (-1, num_classes))
+        ### TODO
+        y = tf.placeholder(tf.float32, shape = (None, 126, 126, 3))
+        learning_rate = tf.placeholder(tf.float32)
+
+        optimize(last_layer, y, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
 
