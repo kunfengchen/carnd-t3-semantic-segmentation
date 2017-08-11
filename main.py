@@ -1,11 +1,12 @@
 import os.path
+import numpy as np
 import tensorflow as tf
 import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 helper.maybe_download_pretrained_vgg('./data')
 
@@ -73,7 +74,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     nn_last_out = tf.layers.conv2d_transpose(skip2, num_classes, 8, strides=(8, 8), name="trans3")
 
     return onebyone, trans1, trans2, nn_last_out
-#KFC tests.test_layers(layers)
+#tests.test_layers(layers)
 
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
@@ -91,7 +92,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
         tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels = correct_label))
     train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
     return logits, train_op, cross_entropy_loss
-#KFC tests.test_optimize(optimize)
+tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -110,27 +111,18 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    #print (train_op)
     batch_gen = get_batches_fn(batch_size)
     for step in range(epochs):
        print("setp ", step)
        batch = next(batch_gen)
-       print("batch.shape: ", batch[0].shape, batch[1].shape)
-       #global_vars = tf.global_variables()
-       #for v in global_vars:
-       #    print(v)
-       #default_graph = tf.get_default_graph()
-       #ii = default_graph.get_tensor_by_name("image_input:0")
-       #sess.run(ii, feed_dict={})
-       #print(ii)
-       print (train_op.run(
-       #print (sess.run([train_op, cross_entropy_loss],
+       #print (train_op.run(
+       print (sess.run([train_op, cross_entropy_loss],
            feed_dict={input_image: batch[0],
                       correct_label: batch[1],
                       keep_prob: 0.5,
                       learning_rate: 0.01
                       } ))
-# KFC tests.test_train_nn(train_nn)
+#KFC tests.test_train_nn(train_nn)
 
 
 def run():
@@ -178,21 +170,13 @@ def run():
             optimize(nn_last_out, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        batch_size = 1;
-        epochs = 1;
+        batch_size = 10;
+        epochs = 10;
         ### train_data_dir = os.path.join(data_dir, 'data_road', 'training')
         init = tf.global_variables_initializer()
         sess.run(init)
-        default_graph = tf.get_default_graph()
 
-        global_vars = tf.global_variables()
-        for v in global_vars:
-            print(v)
-
-        #print("local vars: ", tf.local_variables())
-
-        batch_gen = get_batches_fn(batch_size) # debug only
-        batch = next(batch_gen)  # debug only
+        ### debug the dynamic shapes
         sess_out = sess.run([tf.shape(layer3),
                          tf.shape(layer4),
                          tf.shape(layer7),
@@ -201,17 +185,14 @@ def run():
                          tf.shape(trans2),
                          tf.shape(nn_last_out),
                          tf.shape(logits),
-                         ], feed_dict={image_input: batch[0],
+                         ], feed_dict={image_input: np.zeros((1,256,256,3)),
                                        keep_prob: 0.5})
-
         print ("*** dyn shapes ")
         names = ["layer3", "layer4", "layer7", "onebyone",
                  "trans1", "trans2", "nn_last_out", "logtis" ]
         for n, s in zip(names, sess_out):
             print(n, s)
 
-        #train_nn(sess, epochs, batch_size, helper.gen_batch_function(train_data_dir, image_shape),
-        #         train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate)
         train_nn(sess, epochs, batch_size, get_batches_fn,
                  train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate)
 
