@@ -5,6 +5,8 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 helper.maybe_download_pretrained_vgg('./data')
 
 # Check TensorFlow Version
@@ -39,8 +41,8 @@ def load_vgg(sess, vgg_path):
     default_graph = tf.get_default_graph()
     #print("global vars: ", tf.global_variables())
     #print("local vars: ", tf.local_variables())
-    for op in default_graph.get_operations():
-        print(op.name)
+    #for op in default_graph.get_operations():
+    #    print(op.name)
     image_input = default_graph.get_tensor_by_name(vgg_input_tensor_name)
     keep = default_graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
     layer3 = default_graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
@@ -49,7 +51,6 @@ def load_vgg(sess, vgg_path):
 
     return image_input, keep, layer3, layer4, layer7
 tests.test_load_vgg(load_vgg, tf)
-
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
@@ -61,16 +62,18 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    #KFC
-    onebyone = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1, 1))
-    input = tf.layers.conv2d_transpose(onebyone, 512, 4, 2)
-    input = tf.add(input, vgg_layer4_out)
-    input = tf.layers.conv2d_transpose(input, 256, 4, 2)
-    input = tf.add(input, vgg_layer3_out)
-    input = tf.layers.conv2d_transpose(input, num_classes, 16, 8)
+    #KFC onebyone = tf.layers.conv2d(vgg_layer7_out, num_classes, 1 , 1)
+    onebyone = tf.layers.conv2d(vgg_layer7_out, 4096, 1 , 1)
+    #KFC trans1 = tf.layers.conv2d_transpose(onebyone, 512, 4, strides=(2, 2), name="trans1")
+    trans1 = tf.layers.conv2d_transpose(onebyone, 512, 2, strides=(2, 2), name="trans1")
+    skip1 = tf.add(trans1, vgg_layer4_out)
+    trans2= tf.layers.conv2d_transpose(skip1, 256, 2, strides=(2, 2), name="trans2")
+    skip2 = tf.add(trans2, vgg_layer3_out)
+    #KFC nn_last_out = tf.layers.conv2d_transpose(skip2, num_classes, 16, strides=(8, 8), name="trans3")
+    nn_last_out = tf.layers.conv2d_transpose(skip2, num_classes, 8, strides=(8, 8), name="trans3")
 
-    return input
-tests.test_layers(layers)
+    return onebyone, trans1, trans2, nn_last_out
+#KFC tests.test_layers(layers)
 
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
@@ -83,12 +86,12 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # TODO: Implement function
-    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    logits = tf.reshape(nn_last_layer, (-1, num_classes), name="logits")
     cross_entropy_loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels = correct_label))
     train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
     return logits, train_op, cross_entropy_loss
-tests.test_optimize(optimize)
+#KFC tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -107,13 +110,21 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    print (train_op)
+    #print (train_op)
     batch_gen = get_batches_fn(batch_size)
     for step in range(epochs):
        print("setp ", step)
        batch = next(batch_gen)
-       #print (train_op.run(
-       print (sess.run([train_op, cross_entropy_loss],
+       print("batch.shape: ", batch[0].shape, batch[1].shape)
+       #global_vars = tf.global_variables()
+       #for v in global_vars:
+       #    print(v)
+       #default_graph = tf.get_default_graph()
+       #ii = default_graph.get_tensor_by_name("image_input:0")
+       #sess.run(ii, feed_dict={})
+       #print(ii)
+       print (train_op.run(
+       #print (sess.run([train_op, cross_entropy_loss],
            feed_dict={input_image: batch[0],
                       correct_label: batch[1],
                       keep_prob: 0.5,
@@ -124,7 +135,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
 def run():
     num_classes = 2
-    image_shape = (160, 576)
+    #KFC image_shape = (260, 576)
+    image_shape = (256, 256)
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
@@ -138,9 +150,9 @@ def run():
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction =0.3
+    config.gpu_options.per_process_gpu_memory_fraction =0.5
 
-    correct_label = tf.placeholder(tf.float32, shape = (None, 160, 576, 2))
+    correct_label = tf.placeholder(tf.float32, shape = (None, image_shape[0], image_shape[1], 2))
     learning_rate = tf.placeholder(tf.float32)
 
     with tf.Session(config=config) as sess:
@@ -158,21 +170,49 @@ def run():
 
         # TODO: Build NN using load_vgg, layers, and optimize function
         image_input, keep_prob, layer3, layer4, layer7 = load_vgg(sess, vgg_path)
-        layer_out = layers(layer3, layer4, layer7, num_classes)
-        last_layer = tf.reshape(layer_out, (-1, num_classes))
+        onebyone, trans1, trans2, nn_last_out = layers(layer3, layer4, layer7, num_classes)
+        #last_layer = tf.reshape(layer_out, (-1, num_classes))
         ### TODO
 
         logits, train_op, cross_entropy_loss = \
-            optimize(last_layer, correct_label, learning_rate, num_classes)
+            optimize(nn_last_out, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        batch_size = 50;
-        epochs = 10;
-        train_data_dir = os.path.join(data_dir, 'data_road', 'training')
-        print (train_data_dir)
+        batch_size = 1;
+        epochs = 1;
+        ### train_data_dir = os.path.join(data_dir, 'data_road', 'training')
         init = tf.global_variables_initializer()
         sess.run(init)
-        train_nn(sess, epochs, batch_size, helper.gen_batch_function(train_data_dir, image_shape),
+        default_graph = tf.get_default_graph()
+
+        global_vars = tf.global_variables()
+        for v in global_vars:
+            print(v)
+
+        #print("local vars: ", tf.local_variables())
+
+        batch_gen = get_batches_fn(batch_size) # debug only
+        batch = next(batch_gen)  # debug only
+        sess_out = sess.run([tf.shape(layer3),
+                         tf.shape(layer4),
+                         tf.shape(layer7),
+                         tf.shape(onebyone),
+                         tf.shape(trans1),
+                         tf.shape(trans2),
+                         tf.shape(nn_last_out),
+                         tf.shape(logits),
+                         ], feed_dict={image_input: batch[0],
+                                       keep_prob: 0.5})
+
+        print ("*** dyn shapes ")
+        names = ["layer3", "layer4", "layer7", "onebyone",
+                 "trans1", "trans2", "nn_last_out", "logtis" ]
+        for n, s in zip(names, sess_out):
+            print(n, s)
+
+        #train_nn(sess, epochs, batch_size, helper.gen_batch_function(train_data_dir, image_shape),
+        #         train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate)
+        train_nn(sess, epochs, batch_size, get_batches_fn,
                  train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate)
 
         # TODO: Save inference data using helper.save_inference_samples
