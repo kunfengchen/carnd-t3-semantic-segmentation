@@ -23,11 +23,7 @@ python main.py
 ```
 **Note** If running this in Jupyter Notebook system messages, such as those regarding test status, may appear in the terminal rather than the notebook.
 
-### Submission
-1. Ensure you've passed all the unit tests.
-2. Ensure you pass all points on [the rubric](https://review.udacity.com/#!/rubrics/989/view).
-3. Submit the following in a zip file.
- - `helper.py`
- - `main.py`
- - `project_tests.py`
- - Newest inference images from `runs` folder
+### Test Result
+![alt text](test_result/lose0_0216/um_000021.png)
+![alt text](test_result/lose0_0216/um_000041.png)
+![alt text](test_result/lose0_0216/uu_000011.png)
