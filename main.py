@@ -64,17 +64,21 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     # TODO: Implement function
     #KFC onebyone = tf.layers.conv2d(vgg_layer7_out, num_classes, 1 , 1)
-    onebyone = tf.layers.conv2d(vgg_layer7_out, 4096, 1 , 1)
-    #KFC trans1 = tf.layers.conv2d_transpose(onebyone, 512, 4, strides=(2, 2), name="trans1")
-    trans1 = tf.layers.conv2d_transpose(onebyone, 512, 2, strides=(2, 2), name="trans1")
-    skip1 = tf.add(trans1, vgg_layer4_out)
-    trans2= tf.layers.conv2d_transpose(skip1, 256, 2, strides=(2, 2), name="trans2")
-    skip2 = tf.add(trans2, vgg_layer3_out)
+    #onebyone = tf.layers.conv2d(vgg_layer7_out, 4096, 1 , 1)
+    #onebyone = helper.conv_1x1(vgg_layer7_out, 4096)
+    onebyone = helper.conv_1x1(vgg_layer7_out, num_classes)
+    # trans1 = tf.layers.conv2d_transpose(onebyone, num_classes, 4, strides=(2, 2), name="trans1")
+    trans1 = tf.layers.conv2d_transpose(onebyone, num_classes, 2, 2, name="trans1")
+    skip1 = tf.add(trans1, helper.conv_1x1(vgg_layer4_out, num_classes))
+    # trans2= tf.layers.conv2d_transpose(skip1, num_classes, 2, 2, name="trans2")
+    trans2= tf.layers.conv2d_transpose(skip1, num_classes, 2, 2, name="trans2")
+    skip2 = tf.add(trans2, helper.conv_1x1(vgg_layer3_out, num_classes))
     #KFC nn_last_out = tf.layers.conv2d_transpose(skip2, num_classes, 16, strides=(8, 8), name="trans3")
-    nn_last_out = tf.layers.conv2d_transpose(skip2, num_classes, 8, strides=(8, 8), name="trans3")
+    nn_last_out = tf.layers.conv2d_transpose(skip2, num_classes, 8, 8, name="trans3")
 
-    return onebyone, trans1, trans2, nn_last_out
-#tests.test_layers(layers)
+    # debug shapes  return onebyone, trans1, trans2, nn_last_out
+    return nn_last_out
+tests.test_layers(layers)
 
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
@@ -113,22 +117,28 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     # TODO: Implement function
     batch_gen = get_batches_fn(batch_size)
     for step in range(epochs):
-       print("setp ", step)
-       batch = next(batch_gen)
-       #print (train_op.run(
-       print (sess.run([train_op, cross_entropy_loss],
-           feed_dict={input_image: batch[0],
-                      correct_label: batch[1],
-                      keep_prob: 0.5,
-                      learning_rate: 0.01
-                      } ))
-#KFC tests.test_train_nn(train_nn)
-
+       # print("setp ", step)
+       batch = batch_gen
+       try:
+           batch = next(batch_gen)
+       except TypeError:
+           print(' batch_gen not iteratable')
+       except StopIteration:
+           print(' batch done')
+       else:
+           _, loss = sess.run([train_op, cross_entropy_loss],
+                              feed_dict={input_image: batch[0],
+                                         correct_label: batch[1],
+                                         keep_prob: 0.5,
+                                         learning_rate: 0.001})
+           if step % 5 == 0:
+               print ("epochs: ", step, " loss: ", loss)
+tests.test_train_nn(train_nn)
 
 def run():
     num_classes = 2
     #KFC image_shape = (260, 576)
-    image_shape = (256, 256)
+    image_shape = (256, 512)
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
@@ -142,7 +152,7 @@ def run():
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction =0.5
+    config.gpu_options.per_process_gpu_memory_fraction = 0.5
 
     correct_label = tf.placeholder(tf.float32, shape = (None, image_shape[0], image_shape[1], 2))
     learning_rate = tf.placeholder(tf.float32)
@@ -162,7 +172,8 @@ def run():
 
         # TODO: Build NN using load_vgg, layers, and optimize function
         image_input, keep_prob, layer3, layer4, layer7 = load_vgg(sess, vgg_path)
-        onebyone, trans1, trans2, nn_last_out = layers(layer3, layer4, layer7, num_classes)
+        # debug shapes onebyone, trans1, trans2, nn_last_out = layers(layer3, layer4, layer7, num_classes)
+        nn_last_out = layers(layer3, layer4, layer7, num_classes)
         #last_layer = tf.reshape(layer_out, (-1, num_classes))
         ### TODO
 
@@ -170,13 +181,13 @@ def run():
             optimize(nn_last_out, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        batch_size = 10;
-        epochs = 10;
+        batch_size = 1;
+        epochs = 100;
         ### train_data_dir = os.path.join(data_dir, 'data_road', 'training')
         init = tf.global_variables_initializer()
         sess.run(init)
 
-        ### debug the dynamic shapes
+        """ ### debug the dynamic shapes
         sess_out = sess.run([tf.shape(layer3),
                          tf.shape(layer4),
                          tf.shape(layer7),
@@ -185,19 +196,21 @@ def run():
                          tf.shape(trans2),
                          tf.shape(nn_last_out),
                          tf.shape(logits),
-                         ], feed_dict={image_input: np.zeros((1,256,256,3)),
-                                       keep_prob: 0.5})
+                         ], feed_dict={image_input: np.zeros(
+                                          (1, image_shape[0], image_shape[1], 3)),
+                                       'keep_prob:0': 0.5})
         print ("*** dyn shapes ")
         names = ["layer3", "layer4", "layer7", "onebyone",
                  "trans1", "trans2", "nn_last_out", "logtis" ]
         for n, s in zip(names, sess_out):
             print(n, s)
+        """
 
         train_nn(sess, epochs, batch_size, get_batches_fn,
                  train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate)
 
         # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
 
         # OPTIONAL: Apply the trained model to a video
 

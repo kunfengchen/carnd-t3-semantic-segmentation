@@ -140,7 +140,16 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
         scipy.misc.imsave(os.path.join(output_dir, name), image)
 
 
-# Source from lecture 9.5 quiz
-# custom init with the seed set to 0 by default
-#def custom_init(shape, dtype=tf.float32, partition_info=None, seed=0):
-#    return tf.random_normal(shape, dtype=dtype, seed=seed)
+### Source from lecture 9.5 quiz
+### custom init with the seed set to 0 by default
+def custom_init(shape, dtype=tf.float32, partition_info=None, seed=0):
+    # print("custom init shape: ", shape)
+    return tf.random_normal(shape, dtype=dtype, seed=seed)
+
+### Source from lecture 9.5 quiz
+def conv_1x1(x, num_outputs):
+    kernel_size = 1
+    stride = 1
+    # unknow weights_initializer return tf.layers.conv2d(x, num_outputs, kernel_size, stride, weights_initializer=custom_init)
+    return tf.layers.conv2d(x, num_outputs, kernel_size, stride, kernel_initializer=custom_init)
+    #return tf.layers.conv2d(x, num_outputs, kernel_size, stride)
